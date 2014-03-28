@@ -1,0 +1,52 @@
+*{
+	//border: 1px red dashed;
+}
+
+.code{
+	color: #000000;
+}
+
+.keyword{
+	color: #0000FF;
+}
+
+.literal{
+	color: #A52A2A;
+}
+
+.comment{
+	color: #007500;
+}
+
+.noHighlighting{
+	color: #000000;
+}
+
+.selected{
+	color: #FF0000;
+}
+
+.textArea{
+	height: 100%;
+	min-height: 200px;
+	max-height: 300px;
+	border-style: ridge;
+	width:98%;
+	margin:auto auto;
+	font-family:monospace;
+	overflow: auto;
+}
+
+table {
+	border: none;
+	border-collapse:collapse;
+	padding: 0px;
+	margin: 0px;
+}
+td {
+	border:none;
+	border-collapse:collapse;
+	padding: 0px;
+	margin: 0px;
+	white-space: nowrap;
+}
