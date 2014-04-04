@@ -24,19 +24,16 @@
 	</head>
 
 	<body>
-		<button class="cycleRow">
-			cycle row
-		</button>
 		<button class="addRow">
 			add row
-		</button>
-		<button class="deleteRow">
-			delete row
 		</button>
 		<div id="wrapper">
 			<div id="Editor1"></div>
 		</div>
 		<br>
+		<button class="walk">
+			"walk"
+		</button>
 		<div id="wrapper">
 			<div id="Editor2"></div>
 		</div>
@@ -65,7 +62,7 @@
 				[{text:"hello", type:"literal"},
 				{text:"&nbsp"},
 				{text:"hello", type:"keyword"}]);
-				
+			
 			var editor2 = new Editor("Editor2", true, false, -5, -1, true);
 			editor2.addRow(editor2.getSelectedRowIndex(),
 				[{text:"hello"},
@@ -79,7 +76,7 @@
 				[{text:"hello", type:"literal"},
 				{text:"&nbsp"},
 				{text:"hello", type:"keyword"}]);
-				
+			
 			var editor3 = new Editor("Editor3", false, true, 1, -1, true);
 			editor3.addRow(editor3.getSelectedRowIndex(),
 				[{text:"hello"},
@@ -94,7 +91,7 @@
 				{text:"&nbsp"},
 				{text:"hello", type:"keyword"}]);
 				
-			var editor4 = new Editor("Editor4", false, false, 1, -1, true);
+			var editor4 = new Editor("Editor4", false, false, 0, -1, true);
 			editor4.addRow(editor4.getSelectedRowIndex(),
 				[{text:"hello"},
 				{text:"&nbsp"},
@@ -107,16 +104,6 @@
 				[{text:"hello", type:"literal"},
 				{text:"&nbsp"},
 				{text:"hello", type:"keyword"}]);
-				
-			
-			$('.cycleRow').click(function(){
-				var index = editor1.getSelectedRowIndex()+1;
-				if(index >= editor1.getRowCount()){
-					index = 0;
-				}
-				console.log(index + " " + editor1.getRowCount());
-				editor1.selectRowByIndex(index);
-			});
 			
 			$('.addRow').click(function(){
 				editor1.addRow(editor1.getSelectedRowIndex(),
@@ -125,9 +112,63 @@
 					{text:"line", type:"keyword"}]);
 			});
 			
-			$('.deleteRow').click(function(){
-				editor1.deleteRow(editor1.getSelectedRowIndex());
+			$('.walk').click(function(){
+				var index = editor2.getSelectedRowIndex()+1;
+				if(index >= editor2.getRowCount()){
+					index = 0;
+				}
+				console.log(index + " " + editor2.getRowCount());
+				editor2.selectAndHighlightRowByIndex(index);
 			});
+			
+			editor1.setCellClickListener(function(event){
+				console.log('from index, editor1: cell click');
+				console.log('\t' + $(this).attr('class'));
+				
+				if($(this).hasClass("insert")){
+					if($(this).css('cursor', 'pointer'))
+						editor1.selectRowByIndex($(this).parent().index());
+				}
+				else if($(this).hasClass("lineNum")){
+					console.log($(this).parent().parent().parent().parent().parent().index());
+					editor1.deleteRow($(this).parent().parent().parent().parent().parent().index());
+				}
+				else
+					alert("from editor1: " + $(this).html());
+				
+				return false;
+			});
+			
+			editor2.setCellClickListener(function(event){
+				console.log('from index, editor2: cell click');
+				console.log('\t' + $(this).attr('class'));
+				
+				if($(this).hasClass("insert")){
+					alert("from editor2: insert?");
+				}
+				else
+					alert("from editor2: " + $(this).html());
+				
+				return false;
+			});
+			
+			editor1.setInsertBarMouseEnterListener(function(event){
+				//console.log('from index, editor1: mouseEnter');
+				//console.log('\t' + $(this).attr('class'));
+				editor1.moveInsertionBarCursor($(this).parent().index());
+				
+				return false;
+			});
+			
+			editor2.setInsertBarMouseEnterListener(function(event){
+				//console.log('from index, editor2: mouseEnter');
+				//console.log('\t' + $(this).attr('class'));
+				editor2.moveInsertionBarCursor($(this).parent().index());
+				
+				return false;
+			});
+			
+			
 		</script>
 	</body>
 </html>

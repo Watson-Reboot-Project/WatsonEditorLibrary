@@ -22,6 +22,7 @@
 			Deleting old lines from the editor
 		
 	March 28, 2014 - Should now conform to the pre-alpha API v2
+	April 3, 2014 - Now conforms to the pre-alpha API v3, and first stable release
 */
 
 /* Constructor - constructs the editor
@@ -37,8 +38,12 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, cellWi
 	/*GLOBAL VARIABLES********************************************************/
 	
 	var editorDiv = document.getElementById(divID);			//the div marked by the divID
-	var clickHandler = function(event){return false;};		//the default click handler
+	var clickHandler;		//the click handler
+	var mouseEnterHandler;		//the mouse enter handler
 	var codeTable;			//the table containing the code
+	var insertTable;		//the table containing the insert bar
+	
+	var insertBarCursorIndex = -1;
 	
 	/*copied from the JavaScript lab's original editor.js*/
 	var selRow = 0;											// the current selected row
@@ -48,12 +53,12 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, cellWi
 	var programStart = 0;									// the line the main program starts
 	var firstMove = false;									// keeps track if the user has added something to the main program
 	var innerTableTemplate = "<table class='innerTable" + divID + "'><tr>\
-								<td class='code lineNum'>&nbsp;&nbsp;</td>\
-								<td class='code lineNum'>" + blank + "</td>\
+								<td class='cell" + divID + " code lineNum'>&nbsp;&nbsp;</td>\
+								<td class='cell" + divID + " code lineNum'>" + blank + "</td>\
 							</tr></table>";	// template used for a newly added row in the codeTable
 	var innerTableArrowTemplate = "<table class='innerTable" + divID + "'><tr>\
-										<td class='code lineNum'>&nbsp;&nbsp;</td>\
-										<td class='code lineNum'>" + arrow + "</td>\
+										<td class='cell" + divID + " code lineNum'>&nbsp;&nbsp;</td>\
+										<td class='cell" + divID + " code lineNum'>" + arrow + "</td>\
 									</tr></table>"; // template used for a newly selected row
 	var rowType = [];
 	var curLine;
@@ -71,10 +76,9 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, cellWi
 	var showLineCountFlag = false;
 	/*end copy*/
 	
-	editorDiv.innerHTML = '<div class="textArea"> \
-								<table id="fig' + divID + 'Editor" class="codeTable"></table> \
-							</div>';
-	codeTable = document.getElementById('fig' + divID + 'Editor');
+	editorDiv.innerHTML = '<div class="textArea"><div class="insertDiv"><div class="offsetDiv"></div><table id="insertTable' + divID + '"></table></div><table id="figEditor' + divID + '" class="codeTable"></table></div>';
+	codeTable = document.getElementById('figEditor' + divID);
+	insertTable = document.getElementById('insertTable' + divID);
 	
 	init();
 	
@@ -88,22 +92,31 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, cellWi
 		// make a blank row where the program starts (this could have been in the for loops above)
 		row = codeTable.insertRow(0);	// make a new row
 		cell = row.insertCell(0);		// make a new cell here
+		cell.className = 'cell' + divID;	//a general class for cells in this editor, used for adding/removing click events
 		cell.innerHTML = innerTableArrowTemplate;	// set the cell with arrow template
 		programStart = 0;				// increase the program start to 2
 		selRow = 0;						// selected row is line 2
 		refreshLineCount();				// refresh the line count along the left margin
+		
+		//add a row to the insert bar
+        var row = insertTable.insertRow(selRow);
+        var cell = row.insertCell(0);
+        cell.className = 'cell' + divID + ' insert insert' + divID;
+        cell.innerHTML = blank;
 	}
 	
 	/*PUBLIC FUNCTIONS********************************************************/
 
 	this.rowToArray = rowToArray;
 	this.getRowCount = getRowCount;
-	this.setCellClickListener = setCellClickListener;
-	this.selectRowByIndex = selectRowByIndex;
-	this.selectAndHighlightRowByIndex = selectAndHighlightRowByIndex;
-	this.getSelectedRowIndex = getSelectedRowIndex;
 	this.addRow = addRow;
 	this.deleteRow = deleteRow;
+	this.selectRowByIndex = selectRowByIndex;
+	this.selectAndHighlightRowByIndex = selectAndHighlightRowByIndex;
+	this.moveInsertionBarCursor = moveInsertionBarCursor;
+	this.getSelectedRowIndex = getSelectedRowIndex;
+	this.setCellClickListener = setCellClickListener;
+	this.setInsertBarMouseEnterListener = setInsertBarMouseEnterListener;
 	
 	this.selectRowByStartEnd = selectRowByStartEnd;	//DEPRECATED
 	this.getEditor = getEditor;			//DEPRECATED
@@ -153,7 +166,7 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, cellWi
 			cell.innerHTML = values[i].text;					// make the innerHTML of the cell cells[i]
 			
 			//every cell needs the "code" class
-			cell.className += "code";
+			cell.className += 'cell' + divID + ' code';
 			
 			//if no Highlighting, add class to override others
 			if(!syntaxHighlightingBool){
@@ -165,6 +178,14 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, cellWi
 				cell.className += " " + values[i].type;
 		}
 		
+		//add a row to the insert bar
+        var row = insertTable.insertRow(selRow);
+        var cell = row.insertCell(0);
+        cell.className = 'cell' + divID + ' insert insert' + divID;
+        cell.innerHTML = blank;
+		
+		//console.log(codeTable.getAttribute('id'));
+		
 		//we just inserted a new line, so the next selected line should be empty
 		selRow++;
 		
@@ -174,31 +195,20 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, cellWi
 	/* deleteRow - deletes the row at the specified index
 		@param {number} index - the index of the row to delete
 	*/
-	function deleteRow(index){	
-		//if you chose the last line, delete the line before it
-		if(index == getRowCount() - 1){
-			index--;
-			selRow--;
+	function deleteRow(index){
+		//you can't delete the selected row
+		if(index == selRow){
+			return;
 		}
-	
-		//actually delete the row
+		
 		codeTable.deleteRow(index);
 		
-		if(index == selRow)
-		{
-			//move the selected row, really it's staying still
-			innerTable = codeTable.rows[selRow].cells[0].children[0];
-			innerTable.rows[0].cells[1].innerHTML = arrow;
+		//if the selected row is after the deleted row, decrement selRow
+		if(selRow > index){
+			selRow--;
 		}
 		
 		refreshLineCount(); // refresh the line count along the left margin
-	}
-	
-	/* setCellClickListener - sets the callback function for clicks
-		@param {function} clickFunc - the click callback function, should take a DOM object as an argument
-	*/
-	function setCellClickListener(clickFunc){
-		clickHandler = clickFunc;
 	}
 	
 	/* selectRowByIndex - selects a row based upon the index provided
@@ -206,15 +216,36 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, cellWi
 	*/
 	function selectRowByIndex(index){
 		//if insertBetweedRowsBool is false, prevent the selected row from being anywhere other than the last row
-		//console.log("\t" + index + " " + getRowCount());
 		if(!insertBetweenRowsBool && index < getRowCount()){
+			return;
+		}
+		
+		//if insert bar cursor is not on this line, then you can't select that line, so don't insert
+		if(insertBarCursorIndex != index){
+			return;
+		}
+		
+		//if the selected row is above the row we want to select, then the index is off by 1
+		if(selRow < index){
+			index--;
+		}
+			
+		//if you are already on the last line, then don't do anything
+		if(index + 1 >= codeTable.rows.length){
 			return;
 		}
 		
 		innerTable = codeTable.rows[selRow].cells[0].children[0];
 		innerTable.rows[0].cells[1].innerHTML = blank;
 		
+		//if this is a blank line, remove the row before moving the cursor
+		if(innerTable.rows[0].cells.length <= 2){
+			codeTable.deleteRow(selRow);
+			insertTable.deleteRow(index);
+		}
+		
 		selRow = index;
+		addRow(index + 1, []);
 		innerTable = codeTable.rows[selRow].cells[0].children[0];
 		innerTable.rows[0].cells[1].innerHTML = arrow;
 	}
@@ -228,17 +259,30 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, cellWi
 		
 		//remove the 'selected' class the hard way
 		for(var i = 0; i < innerTable.rows[0].cells.length; i++){
-			innerTable.rows[0].cells[i].className = innerTable.rows[0].cells[i].className.replace("selected", "");
+			innerTable.rows[0].cells[i].className = innerTable.rows[0].cells[i].className.replace("selected running", "");
 		}
 		
 		selRow = index;
 		innerTable = codeTable.rows[selRow].cells[0].children[0];
 		innerTable.rows[0].cells[1].innerHTML = arrow;
 		
-		//add the 'selected' class the hard way
+		//add the 'selected' and 'running' classes the hard way
+		// the 'running' class means that onHover will not remove the selected highlighting
 		for(var i = 0; i < innerTable.rows[0].cells.length; i++){
-			innerTable.rows[0].cells[i].className += " selected";
+			innerTable.rows[0].cells[i].className += " selected running";
 		}
+	}
+	
+	/* moveInsertionBarCursor - moves the cursor in the insertion bar, which is removed in the mouse leave event below
+		@param {numeric} index - the index of the row to move the cursor to
+	*/
+	function moveInsertionBarCursor(index){
+		//console.log("\t" + codeTable.getAttribute('id') + " " + insertTable.getAttribute('id') + " " + insertTable.rows[index].cells[0].className + " " + syntaxHighlightingBool);
+		
+		insertTable.rows[index].cells[0].style.cursor = 'pointer';
+		insertTable.rows[index].cells[0].innerHTML = ">";
+		insertBarCursorIndex = index;
+		console.log(index);
 	}
 	
 	/* getSelectedRowIndex - returns the currently selected row's index
@@ -246,6 +290,33 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, cellWi
 	*/
 	function getSelectedRowIndex(){
 		return selRow;
+	}
+	
+	/* setCellClickListener - sets the callback function for clicks, WARNING: this function turns off the click handlers for "td" elements
+		@param {function} clickFunc - the click callback function, should take a DOM object as an argument
+	*/
+	function setCellClickListener(clickFunc){
+		//turn off the click handler as it is now, should only remove the current clickHandler
+		$('div').off('click', '.cell' + divID, clickHandler);
+		
+		clickHandler = clickFunc;
+		
+		//set the new click handler
+		$('div').on('click', '.cell' + divID, clickHandler);
+	}
+	
+	/* setInsertBarMouseEnterListener - sets the callback function for mouse enter, WARNING: this function turns off the mouse enter handlers for "td" elements
+		@param {function} mouseEnterFunc - the mouse enter callback function, should take a DOM object as an argument
+	*/
+	function setInsertBarMouseEnterListener(mouseEnterFunc){
+		//turn off the mouse enter handler as it is now, should only remove the current mouseEnterHandler
+		//console.log('.insert' + divID + " " + codeTable.getAttribute('id') + " " + insertTable.getAttribute('id') + " " + syntaxHighlightingBool);
+		$('div').off('mouseenter', '.insert' + divID, mouseEnterHandler);
+		
+		mouseEnterHandler = mouseEnterFunc;
+		
+		//set the new mouse enter handler
+		$('div').on('mouseenter', '.insert' + divID, mouseEnterHandler);
 	}
 	
 	
@@ -302,9 +373,15 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, cellWi
 		}*/
 	}
 	
-	/* click - a jQuery event handler for click events on cells
+	/* mouseleave - a jQuery event handler for mouse leave on insert elements, ie cells in the insert bar
 	*/
-	$('div').on('click', '.code', clickHandler);
+	$('div').on('mouseleave', '.insert' + divID, function(event){
+		if($(this).css('cursor') == 'pointer'){
+			$(this).css('cursor', 'default');
+			$(this).html(blank);
+			insertBarCursorIndex = -1;
+		}
+	});
 	
 	/* mouseenter - a jQuery event handler for mouse enter, calls onHover with false
 	*/
@@ -319,10 +396,14 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, cellWi
 		@param {object} event - information about the event that occurred
 		@returns {boolean} returns false to prevent event from propagating
 	*/
-	function onHover(event)
-	{		
+	function onHover(event){
 		//the element that triggered the event, used for convenience
 		var thisElement = $(this);
+		
+		//the 'running' class overiders normal syntax highlighting
+		if(thisElement.hasClass('running')){
+			return;
+		}
 		
 		//the list of elements to affect
 		var elements = thisElement;
