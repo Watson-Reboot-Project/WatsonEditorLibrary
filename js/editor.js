@@ -345,7 +345,6 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, cellWi
 	/* clearHighilighting - manually clears all of the highlighting across the editor
 	*/
 	function clearHighlighting(){
-		console.log("\there", $(codeTable).find('.code').length);
 		$(codeTable).find('.code').removeClass('selected running');
 	}
 	
