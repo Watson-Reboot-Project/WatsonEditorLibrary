@@ -30,10 +30,10 @@
 	@param {boolean} lineNumBool - if true use line numbers, if false do not
 	@param {boolean} syntaxHighlightingBool - if true use syntax highlighting, if false do not
 	@param {number} lineNumStart - what number line numbers should start at
-	@param {number} cellWidth - the width of the first cell? if < 0 fit to text
 	@param {number} insertBetweenRowsBool - if true a line can be inserted/deleted anywhere, if false lines can only be inserted/deleted from the end of the editor
+	@param {number} cellWidth - the width of the first cell? if < 0 fit to text : DEPRECATED. use addRow() to set widths
 */
-function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, cellWidth, insertBetweenRowsBool){
+function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, insertBetweenRowsBool){
 
 	/*GLOBAL VARIABLES********************************************************/
 	
@@ -182,6 +182,8 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, cellWi
 		cell.innerHTML = innerTableTemplate;			// put our inner table template in the new cell
 		var innerTable = codeTable.rows[index].cells[0].children[0];	// grab the inner table over we just created
 		
+		var hasFixedWidths = 0;
+		
 		var startIndex = 2;		//start at 2 to avoid the line numbers
 		
 		for (var i = 0; i < values.length; i++) {			// for all cells in the table
@@ -199,6 +201,36 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, cellWi
 			//if the class is not equal to "code", add whatever it is
 			if(values[i].type != "code" && typeof values[i].type != "undefined")
 				cell.className += " " + values[i].type;
+			
+			//as soon as we see a value with a width do fixed width stuff
+			if(typeof values[i].width != "undefined"){
+				//if this is the first column we've seen with fixed widths, set the width for every column before it
+				// mainly to catch the line number and indent
+				if(hasFixedWidths == 0){
+					for(var j = 0; j < startIndex; j++){
+						innerTable.rows[0].cells[j].style.width = innerTable.rows[0].cells[j].clientWidth + "px";
+						innerTable.rows[0].cells[j].style.overflow = "hidden";
+					}
+				}
+				
+				//so we know that this row should have fixed widths
+				hasFixedWidths = 1;
+			
+				//set the actual width
+				cell.style.width = values[i].width;
+				cell.style.overflow = "hidden";
+			}
+		}
+		
+		/*
+		  if you try to put the stuff in this if statement above where the widths
+		   for each cell are set, everything messes up, so leave it here
+		*/
+		if(hasFixedWidths == 1){
+			var cell = innerTable.rows[0].insertCell(-1);
+			
+			innerTable.style.tableLayout = "fixed";
+			innerTable.style.width = "100%";
 		}
 		
 		//add a row to the insert bar

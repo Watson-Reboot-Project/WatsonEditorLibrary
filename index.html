@@ -65,9 +65,8 @@
 			
 			var editor2 = new Editor("Editor2", true, false, -5, -1, true);
 			editor2.addRow(editor2.getSelectedRowIndex(),
-				[{text:"hello"},
-				{text:"&nbsp"},
-				{text:"world", type:"keyword"},
+				[{text:"hello&nbsp" , width:"50px"},
+				{text:"world&nbsp", type:"keyword", width:"50px"},
 				{text:"this is a relly long line, I mean it seems like it will never end, it just keeps going and going this is a relly long line, I mean it seems like it will never end, it just keeps going and going"}]);
 			editor2.addRow(editor2.getSelectedRowIndex(),
 				[{text:"goodbye"},
