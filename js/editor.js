@@ -34,8 +34,9 @@
 	@param {number} lineNumStart - what number line numbers should start at
 	@param {boolean} insertBetweenRowsBool - if true a line can be inserted/deleted anywhere, if false lines can only be inserted/deleted from the end of the editor
 	@param {boolean} editable - if true, the editor is in sandbox mode, if false, the editor is in figure mode
+	@param {boolean} autoSave - if true the editor will save/load itself, if false it will not save/load
 */
-function Editor(divID, chapterName, exerciseNum, lineNumBool, syntaxHighlightingBool, lineNumStart, insertBetweenRowsBool, editable){
+function Editor(divID, chapterName, exerciseNum, lineNumBool, syntaxHighlightingBool, lineNumStart, insertBetweenRowsBool, editable, autoSave){
 
 	/*GLOBAL VARIABLES********************************************************/
 	
@@ -670,7 +671,7 @@ function Editor(divID, chapterName, exerciseNum, lineNumBool, syntaxHighlighting
 	*/
 	function saveEditor(){
 		//if the editor is in figure mode, you should not need to save anything
-		if(!editable){
+		if(!editable || !autoSave){
 			return;
 		}
 	
@@ -719,7 +720,7 @@ function Editor(divID, chapterName, exerciseNum, lineNumBool, syntaxHighlighting
 	*/
 	function loadEditor(){
 		//if the editor is in figure mode, you should not need to load anything
-		if(!editable){
+		if(!editable || !autoSave){
 			return;
 		}
 		
@@ -757,6 +758,7 @@ function Editor(divID, chapterName, exerciseNum, lineNumBool, syntaxHighlighting
 	/* checkEditorData - simply wraps Watson Data Store's checkExerciseData()
 	*/
 	function checkEditorData(){
+		if(!editable || !autoSave) return false;
 		return dataStore.checkExerciseData(chapterName, exerciseNum);
 	}
 	
