@@ -27,13 +27,15 @@
 
 /* Constructor - constructs the editor
 	@param {number} divID - the ID of the div to place the editor in
+	@param {string} chapterName - the name of the chapter this editor is in, used for data storage
+	@param {number} exerciseNum - the number of the exercise this editor is in, used for data storage
 	@param {boolean} lineNumBool - if true use line numbers, if false do not
 	@param {boolean} syntaxHighlightingBool - if true use syntax highlighting, if false do not
 	@param {number} lineNumStart - what number line numbers should start at
-	@param {number} insertBetweenRowsBool - if true a line can be inserted/deleted anywhere, if false lines can only be inserted/deleted from the end of the editor
-	@param {number} cellWidth - the width of the first cell? if < 0 fit to text : DEPRECATED. use addRow() to set widths
+	@param {boolean} insertBetweenRowsBool - if true a line can be inserted/deleted anywhere, if false lines can only be inserted/deleted from the end of the editor
+	@param {boolean} editable - if true, the editor is in sandbox mode, if false, the editor is in figure mode
 */
-function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, insertBetweenRowsBool){
+function Editor(divID, chapterName, exerciseNum, lineNumBool, syntaxHighlightingBool, lineNumStart, insertBetweenRowsBool, editable){
 
 	/*GLOBAL VARIABLES********************************************************/
 	
@@ -45,6 +47,12 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, insert
 	
 	var insertBarCursorIndex = -1;
 	
+	var dataStore = new DataStore();
+	var savePopupTimeoutObject;	//the timeout object for the save popup
+	var loadPopupTimeoutObject;	//the timeout object for the load popup
+	var saveInterval = 600000;	//the interval length for the auto save feature
+	var autoSaveIntervalObject;	
+	
 	/*copied from the JavaScript lab's original editor.js*/
 	var selRow = 0;											// the current selected row
 	var blank = "&nbsp;&nbsp;&nbsp;";			// blank template for unselected row
@@ -52,14 +60,33 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, insert
 	var indent = "&nbsp;&nbsp;&nbsp;"						// indention used for inside brackets
 	var programStart = 0;									// the line the main program starts
 	var firstMove = false;									// keeps track if the user has added something to the main program
-	var innerTableTemplate = "<table class='innerTable" + divID + "'><tr>\
-								<td class='cell" + divID + " code lineNum'>&nbsp;&nbsp;</td>\
-								<td class='cell" + divID + " code lineNum'>" + blank + "</td>\
-							</tr></table>";	// template used for a newly added row in the codeTable
-	var innerTableArrowTemplate = "<table class='innerTable" + divID + "'><tr>\
-										<td class='cell" + divID + " code lineNum'>&nbsp;&nbsp;</td>\
-										<td class='cell" + divID + " code lineNum'>" + arrow + "</td>\
-									</tr></table>"; // template used for a newly selected row
+	var innerTableTemplate;			// template used for a newly added row in the codeTable
+	var innerTableArrowTemplate;	// template used for a newly selected row
+	
+	if(lineNumBool){
+		innerTableTemplate = "<table class='innerTable" + divID + "'><tr>\
+			<td class='cell" + divID + " code lineNum'>&nbsp;&nbsp;</td>\
+			<td class='cell" + divID + " code lineNum'>" + blank + "</td>\
+			</tr></table>";
+			
+		innerTableArrowTemplate = "<table class='innerTable" + divID + "'><tr>\
+			<td class='cell" + divID + " code lineNum'>&nbsp;&nbsp;</td>\
+			<td class='cell" + divID + " code lineNum'>" + arrow + "</td>\
+			</tr></table>";
+	}
+	else{
+		//if the editor does not have line numbers, make the first cell disappear
+		innerTableTemplate = "<table class='innerTable" + divID + "'><tr>\
+			<td class='cell" + divID + " code lineNum'></td>\
+			<td class='cell" + divID + " code lineNum'>" + blank + "</td>\
+			</tr></table>";
+			
+		innerTableArrowTemplate = "<table class='innerTable" + divID + "'><tr>\
+			<td class='cell" + divID + " code lineNum'></td>\
+			<td class='cell" + divID + " code lineNum'>" + arrow + "</td>\
+			</tr></table>";
+	}
+	
 	var rowType = [];
 	var curLine;
 	var nextLine;
@@ -76,7 +103,8 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, insert
 	var showLineCountFlag = false;
 	/*end copy*/
 	
-	editorDiv.innerHTML = '<div class="textArea"><div class="insertDiv"><div class="offsetDiv"></div><table id="insertTable' + divID + '" class="insertTable"></table></div><div class="codeContainer"><table id="figEditor' + divID + '" class="codeTable"></table></div></div>';
+	editorDiv.innerHTML = '<div class="textArea"><div class="insertDiv"><div class="offsetDiv"></div><table id="insertTable' + divID + '" class="insertTable"></table></div><div class="codeContainer"><table id="figEditor' + divID + '" class="codeTable"><div id="savePopup' + divID + '" class="savePopup">Saved</div></table></div></div>';
+	//editorDiv.style.position = "relative";
 	codeTable = document.getElementById('figEditor' + divID);
 	insertTable = document.getElementById('insertTable' + divID);
 	
@@ -99,16 +127,31 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, insert
 		refreshLineCount();				// refresh the line count along the left margin
 		
 		//add a row to the insert bar
-        var row = insertTable.insertRow(selRow);
-        var cell = row.insertCell(0);
+        row = insertTable.insertRow(selRow);
+        cell = row.insertCell(0);
         cell.className = 'cell' + divID + ' insert insert' + divID;
         cell.innerHTML = "&nbsp;";
+		
+		if(editable){
+			//if there is already data in the data store for this exercise, load it
+			if(dataStore.checkExerciseData(chapterName,exerciseNum)){
+				loadEditor();
+			}
+			
+			//set the auto save interval
+			autoSaveIntervalObject = setInterval(saveEditor, saveInterval);
+		}
+		else{
+			//hide the insertion bar
+			$(insertTable).parent().css("display", "none");
+		}
 	}
 	
 	/*PUBLIC FUNCTIONS********************************************************/
 
 	this.rowToArray = rowToArray;
 	this.rowToArrayHtml = rowToArrayHtml;
+	this.rowToDOMArray = rowToDOMArray;
 	this.getRowCount = getRowCount;
 	this.addRow = addRow;
 	this.addCell = addCell;
@@ -121,6 +164,9 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, insert
 	this.getSelectedRowIndex = getSelectedRowIndex;
 	this.setCellClickListener = setCellClickListener;
 	this.setInsertBarMouseEnterListener = setInsertBarMouseEnterListener;
+	this.saveEditor = saveEditor;
+	this.loadEditor = loadEditor;
+	this.checkEditorData = checkEditorData;
 	
 	this.selectRowByStartEnd = selectRowByStartEnd;	//DEPRECATED
 	this.getEditor = getEditor;			//DEPRECATED
@@ -164,6 +210,14 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, insert
 		return ret;
 	}
 	
+	/* rowToDOMArray - returns DOM objects of the cells in the row
+		@param {number} index - the index of the row to process
+		@returns {array of objects} an array of DOM objects of the cells of the row
+	*/
+	function rowToDOMArray(index){
+		return codeTable.rows[index].cells[0].children[0].rows[0].cells;
+	}
+	
 	/* getRowCount() - returns the number of rows in the editor
 		@returns {numer} the number of rows in the editor
 	*/
@@ -175,8 +229,14 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, insert
 		@param {number} index - the index of the row to insert at
 		@param {object} values - an array of objects with two things: the text of the cell and the class for syntax highlighting
 			every cell automatically receives the "code" class
+		@param {boolean} saveState - if true, save the state of the editor, if false, do not, defaults to true
 	*/
-	function addRow(index, values){	
+	function addRow(index, values, saveState){	
+		//set the default for saveState
+		if(typeof saveState == 'undefined'){
+			saveState = true;
+		}
+	
 		var row = codeTable.insertRow(index);			// get the selected row from the main codeTable
 		var cell = row.insertCell(0);					// make a new cell here
 		cell.innerHTML = innerTableTemplate;			// put our inner table template in the new cell
@@ -245,6 +305,10 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, insert
 		selRow++;
 		
 		refreshLineCount(); // refresh the line count along the left margin
+		
+		if(saveState){
+			saveEditor();
+		}
 	}
 	
 	/* addCell - adds a cell after the one passed
@@ -280,8 +344,14 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, insert
 	
 	/* deleteRow - deletes the row at the specified index
 		@param {number} index - the index of the row to delete
+		@param {boolean} saveState - if true, save the state of the editor, if false, do not, defaults to true
 	*/
-	function deleteRow(index){
+	function deleteRow(index, saveState){
+		//set the default for saveState
+		if(typeof saveState == 'undefined'){
+			saveState = true;
+		}
+		
 		//you can't delete the selected row
 		if(index == selRow){
 			return;
@@ -296,10 +366,15 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, insert
 		}
 		
 		refreshLineCount(); // refresh the line count along the left margin
+		
+		if(saveState){
+			saveEditor();
+		}
 	}
 	
 	/* selectRowByIndex - selects a row based upon the index provided
 		@param {number} index - the row to select
+		@param {boolean} performInsertionCheck - if true check the position of the insertion bar cursor, if false do not
 	*/
 	function selectRowByIndex(index, performInsertionCheck){
 		//if insertBetweedRowsBool is false, prevent the selected row from being anywhere other than the last row
@@ -316,23 +391,25 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, insert
 		if(selRow < index){
 			index--;
 		}
-			
+		
 		//if you are already on the last line, then don't do anything
-		if(index + 1 >= codeTable.rows.length){
+		/*if(index + 1 >= codeTable.rows.length){
 			return;
-		}
+		}*/
 		
-		innerTable = codeTable.rows[selRow].cells[0].children[0];
-		innerTable.rows[0].cells[1].innerHTML = blank;
+		if(selRow > 0 && selRow < codeTable.rows.length){
+			innerTable = codeTable.rows[selRow].cells[0].children[0];
+			innerTable.rows[0].cells[1].innerHTML = blank;
 		
-		//if this is a blank line, remove the row before moving the cursor
-		if(innerTable.rows[0].cells.length <= 2){
-			codeTable.deleteRow(selRow);
-			insertTable.deleteRow(index);
+			//if this is a blank line, remove the row before moving the cursor
+			if(innerTable.rows[0].cells.length <= 2){
+				codeTable.deleteRow(selRow);
+				insertTable.deleteRow(index);
+			}
 		}
 		
 		selRow = index;
-		addRow(index + 1, []);
+		addRow(index + 1, [], false);
 		innerTable = codeTable.rows[selRow].cells[0].children[0];
 		innerTable.rows[0].cells[1].innerHTML = arrow;
 	}
@@ -345,21 +422,184 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, insert
 		innerTable.rows[0].cells[1].innerHTML = blank;
 		
 		if(codeTable.rows[selRow].cells.length >= 0){
-			//remove the 'selected' class the hard way
-			for(var i = 0; i < innerTable.rows[0].cells.length; i++){
-				innerTable.rows[0].cells[i].className = innerTable.rows[0].cells[i].className.replace("selected running", "");
+			//remove the 'selected' and 'running' classes appropriately
+			//add the entire row of cells
+			var thisElement = $(innerTable.rows[0].cells);
+			//the list of elements to affect
+			var elements = thisElement;
+			
+			//do some highlighting stuff, this is all copy pasted from onHover
+			//check the last character of the html to account for indentation
+			if(thisElement.hasClass('openBrack') || thisElement.hasClass('startLoop'))
+			{
+				//console.log('here');
+				//add all the code elements from this row
+				elements = thisElement.parent().parent().parent().parent().parent().find('.code');
+				
+				//only if this cell is an open bracket should we highlight the previous line
+				if(thisElement.hasClass('openBrack')){
+					elements = elements.add(thisElement.parent().parent().parent().parent().parent().prev().find('.code'));
+				}
+			
+				//go up the DOM tree 5 times to get the row, then next() to get the next row
+				var nextRow = thisElement.parent().parent().parent().parent().parent().next();
+				//then look at the next row, go down 5 times and get the html
+				targetCell = nextRow.children().first().children().first().children().first().children().first().children().last();
+				
+				//the count of unclosed scopes so far
+				var count = 1;
+				
+				while(count > 0 && nextRow.length > 0)
+				{
+					//if we find another left brace, then we have another unclosed scope
+					if(targetCell.hasClass('openBrack') || targetCell.hasClass('startLoop'))
+						count++;
+					//if we find a right brace, then we can close a scope
+					else if(targetCell.hasClass('closeBrack') || targetCell.hasClass('endLoop'))
+						count--;
+				
+					//add all of this row's code elements to the elements list
+					elements = elements.add(nextRow.find('.code'));
+					
+					//get the next row
+					nextRow = nextRow.next();
+					//get the html
+					targetCell = nextRow.children().first().children().first().children().first().children().first().children().last();
+				}
 			}
+			else if(thisElement.hasClass('closeBrack') || thisElement.hasClass('endLoop'))
+			{
+				//add all the code elements from this row
+				elements = thisElement.parent().parent().parent().parent().parent().find('.code');
+			
+				//go up the DOM tree 5 times to get the row, then prev() to get the prev row
+				var prevRow = thisElement.parent().parent().parent().parent().parent().prev();
+				//then look at the prev row, go down 5 times and get the html
+				var targetCell = prevRow.children().first().children().first().children().first().children().first().children().last();
+				
+				//the count of unclosed scopes so far
+				var count = 1;
+				
+				while(count > 0 && prevRow.length > 0)
+				{
+					//if we find another right brace, then we have another unclosed scope
+					if(targetCell.hasClass('closeBrack') || targetCell.hasClass('endLoop'))
+						count++;
+					//if we find a left brace, then we can close a scope
+					else if(targetCell.hasClass('openBrack') || targetCell.hasClass('startLoop'))
+						count--;
+				
+					//add all of this row's code elements to the elements list
+					elements = elements.add(prevRow.find('.code'));
+					
+					//get the prev row
+					prevRow = prevRow.prev();
+					//get the html
+					targetCell = prevRow.children().first().children().first().children().first().children().first().children().last();
+				}
+				
+				//only if this cell is an open Bracket should the previous row be added
+				if(thisElement.hasClass("closeBrack")){
+					elements = elements.add(prevRow.find('.code'));
+				}
+			}
+			
+			//actually add the classes
+			elements.removeClass('selected');
+			elements.removeClass('running');
 		}
 		
 		selRow = index;
 		innerTable = codeTable.rows[selRow].cells[0].children[0];
 		innerTable.rows[0].cells[1].innerHTML = arrow;
 		
-		//add the 'selected' and 'running' classes the hard way
+		//add the 'selected' and 'running' classes
 		// the 'running' class means that onHover will not remove the selected highlighting
-		for(var i = 0; i < innerTable.rows[0].cells.length; i++){
-			innerTable.rows[0].cells[i].className += " selected running";
+		console.log('adding classes');
+		//add the entire row of cells
+		var thisElement = $(innerTable.rows[0].cells);
+		//the list of elements to affect
+		var elements = thisElement;
+		
+		//do some highlighting stuff, this is all copy pasted from onHover
+		//check the last character of the html to account for indentation
+		if(thisElement.hasClass('openBrack') || thisElement.hasClass('startLoop'))
+		{
+			//console.log('here');
+			//add all the code elements from this row
+			elements = thisElement.parent().parent().parent().parent().parent().find('.code');
+			
+			//only if this cell is an open bracket should we highlight the previous line
+			if(thisElement.hasClass('openBrack')){
+				elements = elements.add(thisElement.parent().parent().parent().parent().parent().prev().find('.code'));
+			}
+		
+			//go up the DOM tree 5 times to get the row, then next() to get the next row
+			var nextRow = thisElement.parent().parent().parent().parent().parent().next();
+			//then look at the next row, go down 5 times and get the html
+			targetCell = nextRow.children().first().children().first().children().first().children().first().children().last();
+			
+			//the count of unclosed scopes so far
+			var count = 1;
+			
+			while(count > 0 && nextRow.length > 0)
+			{
+				//if we find another left brace, then we have another unclosed scope
+				if(targetCell.hasClass('openBrack') || targetCell.hasClass('startLoop'))
+					count++;
+				//if we find a right brace, then we can close a scope
+				else if(targetCell.hasClass('closeBrack') || targetCell.hasClass('endLoop'))
+					count--;
+			
+				//add all of this row's code elements to the elements list
+				elements = elements.add(nextRow.find('.code'));
+				
+				//get the next row
+				nextRow = nextRow.next();
+				//get the html
+				targetCell = nextRow.children().first().children().first().children().first().children().first().children().last();
+			}
 		}
+		else if(thisElement.hasClass('closeBrack') || thisElement.hasClass('endLoop'))
+		{
+			//add all the code elements from this row
+			elements = thisElement.parent().parent().parent().parent().parent().find('.code');
+		
+			//go up the DOM tree 5 times to get the row, then prev() to get the prev row
+			var prevRow = thisElement.parent().parent().parent().parent().parent().prev();
+			//then look at the prev row, go down 5 times and get the html
+			var targetCell = prevRow.children().first().children().first().children().first().children().first().children().last();
+			
+			//the count of unclosed scopes so far
+			var count = 1;
+			
+			while(count > 0 && prevRow.length > 0)
+			{
+				//if we find another right brace, then we have another unclosed scope
+				if(targetCell.hasClass('closeBrack') || targetCell.hasClass('endLoop'))
+					count++;
+				//if we find a left brace, then we can close a scope
+				else if(targetCell.hasClass('openBrack') || targetCell.hasClass('startLoop'))
+					count--;
+			
+				//add all of this row's code elements to the elements list
+				elements = elements.add(prevRow.find('.code'));
+				
+				//get the prev row
+				prevRow = prevRow.prev();
+				//get the html
+				targetCell = prevRow.children().first().children().first().children().first().children().first().children().last();
+			}
+			
+			//only if this cell is an open Bracket should the previous row be added
+			if(thisElement.hasClass("closeBrack")){
+				elements = elements.add(prevRow.find('.code'));
+			}
+		}
+		
+		//actually add the classes
+		elements.addClass('selected');
+		elements.addClass('running');
 	}
 	
 	/* setSelectedRow - sets the selected row to the value passed
@@ -426,6 +666,101 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, insert
 		$('div').on('mouseenter', '.insert' + divID, mouseEnterHandler);
 	}
 	
+	/* saveEditor - uses the Watson Data Store to save the editor based on the chapter and exercise number
+	*/
+	function saveEditor(){
+		//if the editor is in figure mode, you should not need to save anything
+		if(!editable){
+			return;
+		}
+	
+		//console.log(editorDiv.innerHTML);
+		var tempSelRow = selRow;
+		
+		//delete the selected row to make things easier
+		if(rowToArray(selRow).length <= 0){
+			//force the delete
+			codeTable.deleteRow(selRow);
+			insertTable.deleteRow(selRow);
+			
+			selRow--;
+			
+			refreshLineCount(); // refresh the line count along the left margin
+		}
+		
+		//save the code table
+		dataStore.saveExerciseData(chapterName,exerciseNum,editorDiv.innerHTML);
+		
+		selectRowByIndex(tempSelRow, false);
+
+		//reset the auto save interval
+		clearInterval(autoSaveIntervalObject);
+		autoSaveIntervalObject = setInterval(saveEditor, saveInterval);
+		
+		//ideally, the popup should fade in and fade out after one second, if it comes up again before it fades out, restart the timeout
+		//clear the timeout if it exists to set a new one in a few lines
+		if(typeof savePopupTimeoutObject != 'undefined'){
+			clearTimeout(savePopupTimeoutObject);
+		}
+		
+		//fade in the popup
+		//$('#savePopup' + divID).fadeIn();
+		$('#savePopup' + divID).text("Saved");
+		$('#savePopup' + divID).fadeTo(250, 0.8);
+		
+		//set a timeout to fade the popup out
+		savePopupTimeoutObject = setTimeout(function(){
+			//$('#savePopup' + divID).fadeOut();
+			$('#savePopup' + divID).fadeTo(250, 0);
+		}, 1000);
+	}
+	
+	/* loadEditor - uses the Watson Data Store to load the editor based on the chapter and exercise number
+	*/
+	function loadEditor(){
+		//if the editor is in figure mode, you should not need to load anything
+		if(!editable){
+			return;
+		}
+		
+		editorDiv.innerHTML = "";	//clear the editor
+		editorDiv.innerHTML = dataStore.loadExerciseData(chapterName,exerciseNum);
+		codeTable = document.getElementById('figEditor' + divID);
+		insertTable = document.getElementById('insertTable' + divID);
+		
+		console.log(selRow, getRowCount(),(selRow < getRowCount()-1));
+		if(selRow < getRowCount())
+			selectRowByIndex(getRowCount(), false);
+		else
+			selectRowByIndex(getRowCount()-1, false);
+			
+		//$('#savePopup' + divID).removeAttr('style');
+		
+		//ideally, the popup should fade in and fade out after one second, if it comes up again before it fades out, restart the timeout
+		//clear the timeout if it exists to set a new one in a few lines
+		if(typeof loadPopupTimeoutObject != 'undefined'){
+			clearTimeout(loadPopupTimeoutObject);
+		}
+		
+		//fade in the popup
+		//$('#savePopup' + divID).fadeIn();
+		$('#savePopup' + divID).text("Loaded");
+		$('#savePopup' + divID).fadeTo(250, 0.8);
+		
+		//set a timeout to fade the popup out
+		loadPopupTimeoutObject = setTimeout(function(){
+			//$('#savePopup' + divID).fadeOut();
+			$('#savePopup' + divID).fadeTo(250, 0);
+		}, 1000);
+	}
+	
+	/* checkEditorData - simply wraps Watson Data Store's checkExerciseData()
+	*/
+	function checkEditorData(){
+		return dataStore.checkExerciseData(chapterName, exerciseNum);
+	}
+	
+	/*DEPRECATED FUNCTIONS****************************************************/
 	
 	/* getEditor - DEPRECATED - returns the DOM object representing the editor
 		@return {object} the editor's DOM object
@@ -503,11 +838,11 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, insert
 		@param {object} event - information about the event that occurred
 		@returns {boolean} returns false to prevent event from propagating
 	*/
-	function onHover(event){
+	function onHover(event){	
 		//the element that triggered the event, used for convenience
 		var thisElement = $(this);
 		
-		//the 'running' class overiders normal syntax highlighting
+		//the 'running' class overriders normal syntax highlighting
 		if(thisElement.hasClass('running')){
 			return;
 		}
@@ -518,6 +853,11 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, insert
 		//comments and row numbers highlight the whole line
 		if(thisElement.hasClass('comment') || thisElement.hasClass('lineNum'))
 			elements = thisElement.parent().find('.code');//.removeClass('selected');
+		
+		if(thisElement.hasClass('comma')){
+			elements = elements.add(thisElement.prev());
+			elements = elements.add(thisElement.next());
+		}
 		
 		//begin curly brace and scope stuff, the same concepts as parenthesis, but with more DOM traversing!
 		//this is the cell on the next row that should contain a {
@@ -530,12 +870,16 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, insert
 		}
 		
 		//check the last character of the html to account for indentation
-		if(thisElement.hasClass('openBrack'))
+		if(thisElement.hasClass('openBrack') || thisElement.hasClass('startLoop'))
 		{
 			//console.log('here');
-			//add all the code elements from this row and the previous row
+			//add all the code elements from this row
 			elements = thisElement.parent().parent().parent().parent().parent().find('.code');
-			elements = elements.add(thisElement.parent().parent().parent().parent().parent().prev().find('.code'));
+			
+			//only if this cell is an open bracket should we highlight the previous line
+			if(thisElement.hasClass('openBrack')){
+				elements = elements.add(thisElement.parent().parent().parent().parent().parent().prev().find('.code'));
+			}
 		
 			//go up the DOM tree 5 times to get the row, then next() to get the next row
 			var nextRow = thisElement.parent().parent().parent().parent().parent().next();
@@ -548,10 +892,10 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, insert
 			while(count > 0 && nextRow.length > 0)
 			{
 				//if we find another left brace, then we have another unclosed scope
-				if(targetCell.hasClass('openBrack'))
+				if(targetCell.hasClass('openBrack') || targetCell.hasClass('startLoop'))
 					count++;
 				//if we find a right brace, then we can close a scope
-				else if(targetCell.hasClass('closeBrack'))
+				else if(targetCell.hasClass('closeBrack') || targetCell.hasClass('endLoop'))
 					count--;
 			
 				//add all of this row's code elements to the elements list
@@ -563,7 +907,7 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, insert
 				targetCell = nextRow.children().first().children().first().children().first().children().first().children().last();
 			}
 		}
-		else if(thisElement.hasClass('closeBrack'))
+		else if(thisElement.hasClass('closeBrack') || thisElement.hasClass('endLoop'))
 		{
 			//add all the code elements from this row
 			elements = thisElement.parent().parent().parent().parent().parent().find('.code');
@@ -579,10 +923,10 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, insert
 			while(count > 0 && prevRow.length > 0)
 			{
 				//if we find another right brace, then we have another unclosed scope
-				if(targetCell.hasClass('closeBrack'))
+				if(targetCell.hasClass('closeBrack') || targetCell.hasClass('endLoop'))
 					count++;
 				//if we find a left brace, then we can close a scope
-				else if(targetCell.hasClass('openBrack'))
+				else if(targetCell.hasClass('openBrack') || targetCell.hasClass('startLoop'))
 					count--;
 			
 				//add all of this row's code elements to the elements list
@@ -594,7 +938,10 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, insert
 				targetCell = prevRow.children().first().children().first().children().first().children().first().children().last();
 			}
 			
-			elements = elements.add(prevRow.find('.code'));
+			//only if this cell is an open Bracket should the previous row be added
+			if(thisElement.hasClass("closeBrack")){
+				elements = elements.add(prevRow.find('.code'));
+			}
 		}
 		//end curly brace and scope stuff
 		
@@ -671,4 +1018,10 @@ function Editor(divID, lineNumBool, syntaxHighlightingBool, lineNumStart, insert
 
 		return false;
 	}
+	
+	/* unload - a jQuery event handler for unloading the page, just saves the editor
+	*/
+	$( window ).unload(function() {
+		saveEditor();
+	});
 }

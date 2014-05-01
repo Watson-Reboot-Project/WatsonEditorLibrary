@@ -16,6 +16,7 @@
 		<script src="js/jquery-1.10.2.js"></script>
 		<script src="js/jquery-ui.js"></script>
 		<script src="js/editor.js"></script>
+		<script src="js/WatsonDataStore.js"></script>
 		
 		<meta name="description" content="A test of the Watson Editor API.">
 		<meta name="author" content="Andrew Duryea">
@@ -26,6 +27,12 @@
 	<body>
 		<button class="addRow">
 			add row
+		</button>
+		<button class="save">
+			save
+		</button>
+		<button class="load">
+			"load"
 		</button>
 		<div id="wrapper">
 			<div id="Editor1"></div>
@@ -49,21 +56,34 @@
 		<!-- Some JavaScript to actually insert the editor -->
 		<script type="text/javascript">
 			var len = 0;
-			var editor1 = new Editor("Editor1", true, true, 1, -1, true);
-			editor1.addRow(editor1.getSelectedRowIndex(),
-				[{text:"hello"},
-				{text:"&nbsp"},
-				{text:"world", type:"keyword"}]);
-			editor1.addRow(editor1.getSelectedRowIndex(),
-				[{text:"goodbye"},
-				{text:"&nbsp"},
-				{text:"world", type:"comment"}]);
-			editor1.addRow(editor1.getSelectedRowIndex(),
-				[{text:"hello", type:"literal"},
-				{text:"&nbsp"},
-				{text:"hello", type:"datatype"}]);
+			var editor1 = new Editor("Editor1", "test", 1, true, true, 1, true, true);
+			//if there is not already data for this editor, add initial stuff
+			if(!editor1.checkEditorData()){
+				editor1.addRow(editor1.getSelectedRowIndex(),
+					[{text:"hello"},
+					{text:"&nbsp"},
+					{text:"world", type:"keyword"}]);
+				editor1.addRow(editor1.getSelectedRowIndex(),
+					[{text:"goodbye"},
+					{text:"&nbsp"},
+					{text:"world", type:"comment"}]);
+				editor1.addRow(editor1.getSelectedRowIndex(),
+					[{text:"hello", type:"literal"},
+					{text:"&nbsp"},
+					{text:"hello", type:"datatype"}]);
+			}
 			
-			var editor2 = new Editor("Editor2", true, false, -5, -1, true);
+			//console.log(editor1.rowToDOMArray(1));
+			
+			var editor2 = new Editor("Editor2", "test", 2, true, false, -5, true, false);
+			editor2.addRow(editor2.getSelectedRowIndex(),
+				[{text:"empty"}]);
+			editor2.addRow(editor2.getSelectedRowIndex(),
+				[{text:"startLoop1", type:"openBrack"}]);
+			editor2.addRow(editor2.getSelectedRowIndex(),
+				[{text:"empty"}]);
+			editor2.addRow(editor2.getSelectedRowIndex(),
+				[{text:"startLoop2", type:"startLoop"}]);
 			editor2.addRow(editor2.getSelectedRowIndex(),
 				[{text:"hello&nbsp" , width:"50px"},
 				{text:"world&nbsp", type:"keyword", width:"50px"},
@@ -73,11 +93,15 @@
 				{text:"&nbsp"},
 				{text:"world", type:"comment"}]);
 			editor2.addRow(editor2.getSelectedRowIndex(),
-				[{text:"hello", type:"literal"},
-				{text:"&nbsp"},
-				{text:"hello", type:"keyword"}]);
+				[{text:"hello1", type:"literal"},
+				{text:",&nbsp", type:"comma"},
+				{text:"hello2", type:"keyword"}]);
+			editor2.addRow(editor2.getSelectedRowIndex(),
+				[{text:"endLoop2", type:"closeBrack"}]);
+			editor2.addRow(editor2.getSelectedRowIndex(),
+				[{text:"endLoop1", type:"endLoop"}]);
 			
-			var editor3 = new Editor("Editor3", false, true, 1, -1, true);
+			var editor3 = new Editor("Editor3", "test", 3, false, true, 1, true, false);
 			editor3.addRow(editor3.getSelectedRowIndex(),
 				[{text:"hello"},
 				{text:"&nbsp"},
@@ -91,7 +115,7 @@
 				{text:"&nbsp"},
 				{text:"hello", type:"keyword"}]);
 				
-			var editor4 = new Editor("Editor4", false, false, 0, -1, true);
+			var editor4 = new Editor("Editor4", "test", 4, false, false, 0, true, false);
 			editor4.addRow(editor4.getSelectedRowIndex(),
 				[{text:"hello"},
 				{text:"&nbsp"},
@@ -110,6 +134,14 @@
 					[{text:"new", type:"keyword"},
 					{text:"&nbsp"},
 					{text:"line", type:"keyword"}]);
+			});
+			
+			$('.save').click(function(){
+				editor1.saveEditor();
+			});
+			
+			$('.load').click(function(){
+				editor1.loadEditor();
 			});
 			
 			$('.walk').click(function(){
