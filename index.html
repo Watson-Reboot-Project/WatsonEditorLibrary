@@ -56,7 +56,7 @@
 		<!-- Some JavaScript to actually insert the editor -->
 		<script type="text/javascript">
 			var len = 0;
-			var editor1 = new Editor("Editor1", "test", 1, true, true, 1, true, true);
+			var editor1 = new Editor("Editor1", "test", 1, true, true, 1, true, true, true);
 			//if there is not already data for this editor, add initial stuff
 			if(!editor1.checkEditorData()){
 				editor1.addRow(editor1.getSelectedRowIndex(),
@@ -75,7 +75,7 @@
 			
 			//console.log(editor1.rowToDOMArray(1));
 			
-			var editor2 = new Editor("Editor2", "test", 2, true, false, -5, true, false);
+			var editor2 = new Editor("Editor2", "test", 2, true, false, -5, true, false, false);
 			editor2.addRow(editor2.getSelectedRowIndex(),
 				[{text:"empty"}]);
 			editor2.addRow(editor2.getSelectedRowIndex(),
@@ -101,7 +101,7 @@
 			editor2.addRow(editor2.getSelectedRowIndex(),
 				[{text:"endLoop1", type:"endLoop"}]);
 			
-			var editor3 = new Editor("Editor3", "test", 3, false, true, 1, true, false);
+			var editor3 = new Editor("Editor3", "test", 3, false, true, 1, true, false, false);
 			editor3.addRow(editor3.getSelectedRowIndex(),
 				[{text:"hello"},
 				{text:"&nbsp"},
@@ -115,7 +115,7 @@
 				{text:"&nbsp"},
 				{text:"hello", type:"keyword"}]);
 				
-			var editor4 = new Editor("Editor4", "test", 4, false, false, 0, true, false);
+			var editor4 = new Editor("Editor4", "test", 4, false, false, 0, true, false, false);
 			editor4.addRow(editor4.getSelectedRowIndex(),
 				[{text:"hello"},
 				{text:"&nbsp"},
