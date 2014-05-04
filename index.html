@@ -56,11 +56,20 @@
 		<!-- Some JavaScript to actually insert the editor -->
 		<script type="text/javascript">
 			var len = 0;
-			var editor1 = new Editor("Editor1", "test", 1, true, true, 1, true, true, true);
+			var editor1 = new Editor("Editor1", "test", 1, true, true, 1, true, false, false);
 			//if there is not already data for this editor, add initial stuff
 			if(!editor1.checkEditorData()){
 				editor1.addRow(editor1.getSelectedRowIndex(),
-					[{text:"hello"},
+					[{text:"1"},
+					{text:"2"},
+					{text:"3"},
+					{text:"4"},
+					{text:"5"},
+					{text:"6"},
+					{text:"7"},
+					{text:"8"},
+					{text:"9"},
+					{text:"0"},
 					{text:"&nbsp"},
 					{text:"world", type:"keyword"}]);
 				editor1.addRow(editor1.getSelectedRowIndex(),
@@ -76,31 +85,30 @@
 			//console.log(editor1.rowToDOMArray(1));
 			
 			var editor2 = new Editor("Editor2", "test", 2, true, false, -5, true, false, false);
-			editor2.addRow(editor2.getSelectedRowIndex(),
-				[{text:"empty"}]);
-			editor2.addRow(editor2.getSelectedRowIndex(),
-				[{text:"startLoop1", type:"openBrack"}]);
-			editor2.addRow(editor2.getSelectedRowIndex(),
-				[{text:"empty"}]);
-			editor2.addRow(editor2.getSelectedRowIndex(),
-				[{text:"startLoop2", type:"startLoop"}]);
-			editor2.addRow(editor2.getSelectedRowIndex(),
-				[{text:"hello&nbsp" , width:"50px"},
-				{text:"world&nbsp", type:"keyword", width:"50px"},
-				{text:"this is a relly long line, I mean it seems like it will never end, it just keeps going and going this is a relly long line, I mean it seems like it will never end, it just keeps going and going"}]);
-			editor2.addRow(editor2.getSelectedRowIndex(),
-				[{text:"goodbye"},
-				{text:"&nbsp"},
-				{text:"world", type:"comment"}]);
-			editor2.addRow(editor2.getSelectedRowIndex(),
-				[{text:"hello1", type:"literal"},
-				{text:",&nbsp", type:"comma"},
-				{text:"hello2", type:"keyword"}]);
-			editor2.addRow(editor2.getSelectedRowIndex(),
-				[{text:"endLoop2", type:"closeBrack"}]);
-			editor2.addRow(editor2.getSelectedRowIndex(),
-				[{text:"endLoop1", type:"endLoop"}]);
-			
+			if(!editor2.checkEditorData()){
+				editor2.addRow(editor2.getSelectedRowIndex(),
+					[//{text:""},
+					{text:"if", type:"keyword"},
+					{text:"(", type:"openParen"},
+					{text:"EXPR"},
+					{text:")", type:"closeParen"}]);
+				editor2.addRow(editor2.getSelectedRowIndex(),
+					[//{text:""},
+					{text:"{", type:"startLoop"}]);
+				editor2.addRow(editor2.getSelectedRowIndex(),
+					[//{text:""},
+					{text:"stuff"}]);
+				editor2.addRow(editor2.getSelectedRowIndex(),
+					[//{text:""},
+					{text:"stuff"}]);
+				editor2.addRow(editor2.getSelectedRowIndex(),
+					[//{text:""},
+					{text:"stuff"}]);
+				editor2.addRow(editor2.getSelectedRowIndex(),
+					[//{text:""},
+					{text:"}", type:"endLoop"}]);
+			}
+				
 			var editor3 = new Editor("Editor3", "test", 3, false, true, 1, true, false, false);
 			editor3.addRow(editor3.getSelectedRowIndex(),
 				[{text:"hello"},
@@ -137,11 +145,11 @@
 			});
 			
 			$('.save').click(function(){
-				editor1.saveEditor();
+				editor2.saveEditor();
 			});
 			
 			$('.load').click(function(){
-				editor1.loadEditor();
+				editor2.loadEditor();
 			});
 			
 			$('.walk').click(function(){
@@ -154,9 +162,10 @@
 			});
 			
 			editor1.setCellClickListener(function(event){
+				event.stopPropagation();
 				console.log('from index, editor1: cell click');
 				console.log('\t' + $(this).attr('class'));
-				
+				/*
 				if($(this).hasClass("insert")){
 					if($(this).css('cursor', 'pointer'))
 						editor1.selectRowByIndex($(this).parent().index());
@@ -167,6 +176,8 @@
 				}
 				else
 					alert("from editor1: " + $(this).html());
+				*/
+				editor1.addCell($(this), [{text:"new1", type:"keyword"},{text:"new2", type:"datatype"},{text:"new3", type:"literal"}]);
 				
 				return false;
 			});
