@@ -37,6 +37,8 @@ function Editor(divID, chapterName, exerciseNum, lineNumBool, syntaxHighlighting
 
 	/*GLOBAL VARIABLES********************************************************/
 	
+	this.divID = divID;
+	
 	var editorDiv = document.getElementById(divID);			//the div marked by the divID
 	var clickHandler;		//the click handler
 	var mouseEnterHandler;		//the mouse enter handler
@@ -61,30 +63,21 @@ function Editor(divID, chapterName, exerciseNum, lineNumBool, syntaxHighlighting
 	var innerTableTemplate;			// template used for a newly added row in the codeTable
 	var innerTableArrowTemplate;	// template used for a newly selected row
 	
-	if(lineNumBool){
-		innerTableTemplate = "<table class='innerTable" + divID + "'><tr>\
-			<td class='cell" + divID + " code lineNum'>&nbsp;&nbsp;</td>\
-			<td class='cell" + divID + " code lineNum'>" + blank + "</td>\
-			</tr></table>";
-			
-		innerTableArrowTemplate = "<table class='innerTable" + divID + "'><tr>\
-			<td class='cell" + divID + " code lineNum'>&nbsp;&nbsp;</td>\
-			<td class='cell" + divID + " code lineNum'>" + arrow + "</td>\
-			</tr></table>";
-	}
-	else{
-		//if the editor does not have line numbers, make the first cell disappear
-		innerTableTemplate = "<table class='innerTable" + divID + "'><tr>\
-			<td class='cell" + divID + " code lineNum'></td>\
-			<td class='cell" + divID + " code lineNum'>" + blank + "</td>\
-			</tr></table>";
-			
-		innerTableArrowTemplate = "<table class='innerTable" + divID + "'><tr>\
-			<td class='cell" + divID + " code lineNum'></td>\
-			<td class='cell" + divID + " code lineNum'>" + arrow + "</td>\
-			</tr></table>";
+	var lineNumSpacing = '&nbsp;&nbsp;';
+	if(!lineNumBool){
+		//if line numbers are turned off, we want this space to disappear
+		lineNumSpacing = '';
 	}
 	
+	innerTableTemplate = "<table class='innerTable" + divID + "'><tr>\
+		<td class='cell" + divID + " code lineNum'>" + lineNumSpacing + "</td>\
+		<td class='cell" + divID + " code lineNum'>" + blank + "</td>\
+		</tr></table>";
+
+	innerTableArrowTemplate = "<table class='innerTable" + divID + "'><tr>\
+		<td class='cell" + divID + " code lineNum'>" + lineNumSpacing + "</td>\
+		<td class='cell" + divID + " code lineNum'>" + arrow + "</td>\
+		</tr></table>";
 	var rowType = [];
 	var curLine;
 	var nextLine;
@@ -109,8 +102,14 @@ function Editor(divID, chapterName, exerciseNum, lineNumBool, syntaxHighlighting
 	init();
 	
 	/* init - .... it initializes some important stuff .. o_0
+		@param {boolean} load - if true tries to load data using Watson Data Store, for use with clearEditor
 	*/
-	function init() {
+	function init(load) {
+		//set the default for load
+		if(typeof saveState == 'undefined'){
+			load = true;
+		}
+		
 		var row;
 		var cell;
 		var innerTable;
@@ -130,16 +129,19 @@ function Editor(divID, chapterName, exerciseNum, lineNumBool, syntaxHighlighting
         cell.className = 'cell' + divID + ' insert insert' + divID;
         cell.innerHTML = "&nbsp;";
 		
-		if(editable){
-			//if there is already data in the data store for this exercise, load it
-			if(dataStore.checkExerciseData(chapterName,exerciseNum)){
-				loadEditor();
+		/*if(editable){
+			if(load){
+				//if there is already data in the data store for this exercise, load it
+				if(dataStore.checkExerciseData(chapterName,exerciseNum)){
+					loadEditor();
+				}
+				
+				//set the auto save interval
+				autoSaveIntervalObject = setInterval(saveEditor, saveInterval);
 			}
-			
-			//set the auto save interval
-			autoSaveIntervalObject = setInterval(saveEditor, saveInterval);
 		}
-		else{
+		else{*/
+		if(!editable){
 			//hide the insertion bar
 			$(insertTable).parent().css("display", "none");
 		}
@@ -165,7 +167,9 @@ function Editor(divID, chapterName, exerciseNum, lineNumBool, syntaxHighlighting
 	this.setInsertBarMouseEnterListener = setInsertBarMouseEnterListener;
 	this.saveEditor = saveEditor;
 	this.loadEditor = loadEditor;
+	this.clearEditor = clearEditor;
 	this.checkEditorData = checkEditorData;
+	this.changeDivID = changeDivID;
 	
 	this.selectRowByStartEnd = selectRowByStartEnd;	//DEPRECATED
 	this.getEditor = getEditor;			//DEPRECATED
@@ -713,10 +717,16 @@ function Editor(divID, chapterName, exerciseNum, lineNumBool, syntaxHighlighting
 	}
 	
 	/* saveEditor - uses the Watson Data Store to save the editor based on the chapter and exercise number
+		@param {boolean} force - if true a save is forced regardless of editable and autoSave, defaults to false
 	*/
-	function saveEditor(){
+	function saveEditor(force){
+		//set force to default to false
+		if(typeof force == 'undefined'){
+			force = false;
+		}
+		
 		//if the editor is in figure mode, you should not need to save anything
-		if(!editable || !autoSave){
+		if(!force &&(!editable || !autoSave)){
 			return;
 		}
 	
@@ -752,7 +762,6 @@ function Editor(divID, chapterName, exerciseNum, lineNumBool, syntaxHighlighting
 		
 		//save the code table
 		dataStore.saveExerciseData(chapterName,exerciseNum,editorDiv.innerHTML);
-		dataStore.saveExerciseData(chapterName,exerciseNum+"Editable",highlighted);
 		
 		console.log(isBlankLine, highlighted);
 		if(isBlankLine){
@@ -786,18 +795,66 @@ function Editor(divID, chapterName, exerciseNum, lineNumBool, syntaxHighlighting
 	}
 	
 	/* loadEditor - uses the Watson Data Store to load the editor based on the chapter and exercise number
+		@param {string} oldDivID - if not null, will call changeDivID with this argument
+		@param {string} newDivID - if not null, will call changeDivID with this argument
+		@param {boolean} force - if true a load is forced regardless of editable and autoSave, defaults to false
 	*/
-	function loadEditor(){
+	function loadEditor(oldDivID, newDivID, force){
+		//set force to default to false
+		if(typeof force == 'undefined'){
+			force = false;
+		}
+		
 		//if the editor is in figure mode, you should not need to load anything
-		if(!editable || !autoSave){
+		if(!force && (!editable || !autoSave)){
 			return;
 		}
 		
+		//force checkEditorData to be sure that something exists in the data stroe
+		if(!checkEditorData(true))
+			return;
+		
 		editorDiv.innerHTML = "";	//clear the editor
 		editorDiv.innerHTML = dataStore.loadExerciseData(chapterName,exerciseNum);
+		
+		if(oldDivID != null && newDivID != null){
+			changeDivID(oldDivID, newDivID);
+		}
+		
 		codeTable = document.getElementById('figEditor' + divID);
 		insertTable = document.getElementById('insertTable' + divID);
 		
+		//make it look like it should with insertion bar, no highlighting, and line numbers
+		if(editable){
+			//turn on insertion bar
+			$(insertTable).parent().css("display", "table");
+			
+		}
+		else{
+			//turn off insertion bar
+			$(insertTable).parent().css("display", "none");
+		}
+		
+		//set the lineNumber spacing to whatever it was set to earlier
+		$('.cell' + divID + '.code.lineNum:first-of-type').html(lineNumSpacing);
+		refreshLineCount();
+		
+		if(syntaxHighlightingBool){
+			//turn on syntax highlighting
+			$('.cell' + divID + '.noHighlighting').removeClass('noHighlighting');
+		}
+		else{
+			//turn off syntax highlighting
+			$('.cell' + divID).not('.noHighlighting').addClass('noHighlighting');
+		}
+		
+		//console.log(selRow, getRowCount(),(selRow < getRowCount()-1));
+		if(selRow < getRowCount())
+			selectRowByIndex(getRowCount(), false);
+		else
+			selectRowByIndex(getRowCount()-1, false);
+		
+			
 		//console.log(selRow, getRowCount(),(selRow < getRowCount()));
 		
 		if(selRow < getRowCount()){
@@ -833,12 +890,54 @@ function Editor(divID, chapterName, exerciseNum, lineNumBool, syntaxHighlighting
 		}, 1000);
 	}
 	
-	/* checkEditorData - simply wraps Watson Data Store's checkExerciseData()
-		@returns {boolean} if true data exists for this chapter, exercise combination, if false no data exists
+	/* clearEditor - clears the editor and uses the Watson Data Store to clear the editor's saved data
 	*/
-	function checkEditorData(){
-		if(!editable || !autoSave) return false;
+	function clearEditor(){
+		console.log('here3');
+		dataStore.eraseExerciseData(chapterName, exerciseNum);
+	
+		codeTable.innerHTML = "";
+		insertTable.innerHTML = "";
+		
+		init(false);
+	}
+	
+	/* checkEditorData - simply wraps Watson Data Store's checkExerciseData()
+		@param {boolean} force - if true a check is forced regardless of editable and autoSave, defaults to false
+
+	*/
+	function checkEditorData(force){
+		//set force to default to false
+		if(typeof force == 'undefined'){
+			force = false;
+		}
+		
+		if(!force && (!editable || !autoSave))
+			return false;
 		return dataStore.checkExerciseData(chapterName, exerciseNum);
+	}
+
+	/* changeDivID - changes the divID parameter that was passed to the editor an resets it everywhere else as well
+		@param {string} oldDivID - the old divID to replace
+		@param {string} newDivID - the new divID to replace the old one with
+	*/
+	function changeDivID(oldDivID, newDivID){
+		console.log("here1000", oldDivID, divID, newDivID);
+		//replace the old divID in the editor's innerHTML
+		console.log("bef", editorDiv.innerHTML.indexOf(oldDivID)/*, editorDiv.innerHTML.substring(editorDiv.innerHTML.indexOf(oldDivID), editorDiv.innerHTML.indexOf(oldDivID)+100)*/);
+		while(editorDiv.innerHTML.indexOf(oldDivID) >= 0){
+			editorDiv.innerHTML = editorDiv.innerHTML.replace(oldDivID, newDivID);
+		}
+		console.log("aft", editorDiv.innerHTML.indexOf(oldDivID)/*, editorDiv.innerHTML.substring(editorDiv.innerHTML.indexOf(oldDivID), editorDiv.innerHTML.indexOf(oldDivID)+100)*/);
+		
+		//set the divID
+		divID = newDivID;
+		
+		//reset codeTable and insertTable
+		codeTable = document.getElementById('figEditor' + divID);
+		insertTable = document.getElementById('insertTable' + divID);
+		
+		console.log(codeTable.getAttribute('id'));
 	}
 	
 	/*DEPRECATED FUNCTIONS****************************************************/
