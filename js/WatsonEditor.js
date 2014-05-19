@@ -646,7 +646,7 @@ function Editor(divID, chapterName, exerciseNum, lineNumBool, syntaxHighlighting
 		}
 			
 		//delete the selected row to make things easier
-		console.log(rowToArray(selRow).length);
+		//console.log(rowToArray(selRow).length);
 		if(rowToArray(selRow).length <= 0){
 			isBlankLine = true;
 			//force the delete
@@ -668,7 +668,7 @@ function Editor(divID, chapterName, exerciseNum, lineNumBool, syntaxHighlighting
 		//save the code table
 		dataStore.saveExerciseData(chapterName,exerciseNum,editorDiv.innerHTML);
 		
-		console.log(isBlankLine, highlighted);
+		//console.log(isBlankLine, highlighted);
 		if(isBlankLine){
 			selectRowByIndex(tempSelRow, false);
 		}
@@ -802,7 +802,7 @@ function Editor(divID, chapterName, exerciseNum, lineNumBool, syntaxHighlighting
 	/* clearEditor - clears the editor and uses the Watson Data Store to clear the editor's saved data
 	*/
 	function clearEditor(){
-		console.log('here3', dataStore);
+		//console.log('here3', dataStore);
 		dataStore.eraseExerciseData(chapterName, exerciseNum);
 	
 		codeTable.innerHTML = "";
@@ -913,7 +913,6 @@ function Editor(divID, chapterName, exerciseNum, lineNumBool, syntaxHighlighting
 	/* mouseleave - a jQuery event handler for mouse leave on insert elements, ie cells in the insert bar
 	*/
 	$('div').on('mouseleave', '.insert' + divID, function(event){
-	console.log("here30000");
 		if($(this).css('cursor') == 'pointer'){
 			$(this).css('cursor', 'default');
 			$(this).html("&nbsp;");
